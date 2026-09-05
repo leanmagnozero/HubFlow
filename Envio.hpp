@@ -1,11 +1,12 @@
 #ifndef HUBFLOW_ENVIO_HPP
 #define HUBFLOW_ENVIO_HPP
+
 #include "NivelServicio.hpp"
+#include "Historial.hpp"
 #include <string>
 
 /// Estados posibles del ciclo de vida de un envío.
-enum class EstadoEnvio
-{
+enum class EstadoEnvio {
     RECIBIDO,
     CLASIFICADO,
     EN_REPARTO,
@@ -16,22 +17,12 @@ enum class EstadoEnvio
 /**
  * @brief Representa un envío gestionado por el centro de distribución.
  *
- * Esta clase no administra su propio ciclo de vida de memoria respecto
- * de las listas: el ownership del objeto Envio recae en la estructura
- * que lo haya creado (ej: un registro central), nunca en los nodos de
- * ListaPendientes ni de un historial, que solo lo referencian.
+ * Es dueño de su propio Historial: se crea junto con el envío y se
+ * destruye automáticamente cuando el envío se destruye (RAII), sin
+ * necesidad de new/delete manual para esa parte.
  */
-class Envio
-{
-  public:
-    /**
-     * @brief Construye un envío nuevo con estado inicial RECIBIDO.
-     * @param codigo Código único de seguimiento.
-     * @param destinatario Nombre del destinatario.
-     * @param zona Zona de entrega.
-     * @param peso Peso en kilogramos.
-     * @param servicio Nivel de servicio contratado.
-     */
+class Envio {
+public:
     Envio(std::string codigo, std::string destinatario, std::string zona,
           double peso, NivelServicio servicio);
 
@@ -46,7 +37,12 @@ class Envio
     void setEstado(EstadoEnvio nuevoEstado) { estado_ = nuevoEstado; }
     void incrementarIntentos() { ++intentos_; }
 
-  private:
+    // Acceso al historial: no-const para poder agregar movimientos,
+    // const para solo consultarlo (mostrarAdelante/mostrarAtras).
+    Historial& getHistorial() { return historial_; }
+    const Historial& getHistorial() const { return historial_; }
+
+private:
     std::string codigo_;
     std::string destinatario_;
     std::string zona_;
@@ -54,6 +50,7 @@ class Envio
     NivelServicio servicio_;
     EstadoEnvio estado_{EstadoEnvio::RECIBIDO};
     int intentos_{0};
+    Historial historial_;   // miembro por valor: Envio es dueño, se destruye solo
 };
-#endif // HUBFLOW_ENVIO_HPP
 
+#endif // HUBFLOW_ENVIO_HPP

@@ -11,5 +11,5 @@ Envio::Envio(std::string codigo, std::string destinatario, std::string zona,
     // Movimiento inicial obligatorio (sección 8 / RF01):
     // todo envío nace RECIBIDO y eso queda asentado en su historial.
     historial_.agregar(Movimiento(1, EstadoEnvio::RECIBIDO,
-                                   "Ingreso al centro de distribución"));
+                                  "Ingreso al centro de distribución"));
 }
