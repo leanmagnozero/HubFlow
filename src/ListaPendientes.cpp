@@ -1,5 +1,5 @@
-#include "ListaPendientes.hpp"
-#include "NivelServicio.hpp"
+#include "../include/ListaPendientes.hpp"
+#include "../include/NivelServicio.hpp"
 
 ListaPendientes::~ListaPendientes() {
     NodoPendiente* actual = cabeza_;
