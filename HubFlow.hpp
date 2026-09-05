@@ -9,11 +9,13 @@
 #include <string>
 
 /**
- * @brief Coordina la gestión de los envíos del centro de distribución.
+ * @brief Coordina la gestión de los envíos del sistema HubFlow.
  *
- * HubFlow mantiene el registro central de los envíos y coordina las
- * operaciones de registro, búsqueda, despacho, reprogramación,
- * actualización de estados y finalización de entregas.
+ * Mantiene un registro central de todos los envíos y una lista
+ * de los envíos que se encuentran pendientes.
+ *
+ * El registro central conserva los objetos Envio aunque estos
+ * sean retirados de la lista de pendientes.
  */
 class HubFlow
 {
@@ -22,65 +24,107 @@ public:
     /**
      * @brief Construye un HubFlow vacío.
      */
-    HubFlow() = default;
+    HubFlow();
 
     /**
-     * @brief Registra un nuevo envío en el sistema.
-     *
-     * El envío debe quedar almacenado en el registro central y también
-     * incorporarse a la lista de pendientes respetando su prioridad.
-     *
-     * @param envio Envío que se desea registrar.
+     * @brief Destruye el sistema y libera la memoria dinámica.
      */
-    void registrarEnvio(Envio* envio);
+    ~HubFlow();
 
     /**
-     * @brief Muestra todos los envíos que se encuentran pendientes.
+     * @brief Impide copiar un HubFlow.
+     *
+     * @param otro Objeto HubFlow que se intentaría copiar.
+     */
+    HubFlow(const HubFlow&) = delete;
+
+    /**
+     * @brief Impide asignar un HubFlow a otro.
+     *
+     * @param otro Objeto HubFlow que se intentaría asignar.
+     *
+     * @return Referencia al objeto actual.
+     */
+    HubFlow& operator=(const HubFlow&) = delete;
+
+    /**
+     * @brief Registra un nuevo envío.
+     *
+     * Verifica que el código sea único, crea dinámicamente
+     * el envío, registra el movimiento inicial y lo incorpora
+     * a la lista de pendientes.
+     *
+     * @param codigo Código único del envío.
+     * @param destinatario Nombre del destinatario.
+     * @param zona Zona de entrega.
+     * @param peso Peso del envío.
+     * @param servicio Nivel de servicio.
+     *
+     * @return true si el envío fue registrado correctamente.
+     * @return false si el código ya existe.
+     */
+    bool registrarEnvio(const std::string& codigo,
+                        const std::string& destinatario,
+                        const std::string& zona,
+                        double peso,
+                        NivelServicio servicio);
+
+    /**
+     * @brief Muestra todos los envíos pendientes.
      */
     void mostrarPendientes() const;
 
     /**
-     * @brief Busca un envío por su código de seguimiento.
+     * @brief Busca un envío por su código.
      *
-     * La búsqueda se realiza sobre el registro central, por lo que
-     * también permite encontrar envíos que ya fueron despachados.
+     * La búsqueda se realiza sobre el registro central.
      *
-     * @param codigo Código de seguimiento del envío.
-     * @return Puntero al envío encontrado, o nullptr si no existe.
+     * @param codigo Código del envío.
+     *
+     * @return Puntero al envío encontrado o nullptr si no existe.
      */
-    Envio* buscarEnvio(const std::string& codigo);
+    Envio* buscarEnvio(const std::string& codigo) const;
 
     /**
-     * @brief Cambia el estado de un envío y registra el movimiento.
+     * @brief Cambia el estado de un envío.
      *
-     * @param codigo Código del envío cuyo estado se desea modificar.
-     * @param nuevoEstado Nuevo estado del envío.
-     * @param observacion Descripción del movimiento realizado.
-     * @return true si el envío fue encontrado y actualizado,
-     *         false si no existe.
+     * También registra el cambio en su historial.
+     *
+     * @param codigo Código del envío.
+     * @param nuevoEstado Nuevo estado.
+     * @param observacion Descripción del movimiento.
+     *
+     * @return true si el envío fue encontrado y actualizado.
+     * @return false si el envío no existe.
      */
     bool cambiarEstado(const std::string& codigo,
                        EstadoEnvio nuevoEstado,
                        const std::string& observacion);
 
     /**
-     * @brief Despacha el próximo envío según su prioridad.
+     * @brief Despacha el primer envío pendiente.
      *
-     * El envío se elimina de la lista de pendientes pero continúa
-     * existiendo en el registro central.
+     * Cambia su estado a EN_REPARTO y elimina solamente
+     * el nodo de la lista de pendientes.
      *
-     * @return Puntero al envío despachado, o nullptr si no hay
-     *         envíos pendientes.
+     * El objeto Envio continúa existiendo en el registro central.
+     *
+     * @return Puntero al envío despachado o nullptr si no hay pendientes.
      */
     Envio* despacharProximo();
 
     /**
-     * @brief Reprograma un envío y registra el movimiento correspondiente.
+     * @brief Reprograma un envío cuya entrega no pudo realizarse.
      *
-     * @param codigo Código del envío que se desea reprogramar.
-     * @param observacion Motivo o detalle de la reprogramación.
-     * @return true si el envío fue encontrado y reprogramado,
-     *         false si no existe.
+     * Incrementa los intentos, cambia el estado a REPROGRAMADO,
+     * registra el movimiento y vuelve a insertar el envío
+     * en la lista de pendientes respetando su prioridad.
+     *
+     * @param codigo Código del envío.
+     * @param observacion Motivo de la reprogramación.
+     *
+     * @return true si se pudo reprogramar.
+     * @return false si el envío no existe o ya fue entregado.
      */
     bool reprogramarEnvio(const std::string& codigo,
                           const std::string& observacion);
@@ -88,48 +132,120 @@ public:
     /**
      * @brief Finaliza la entrega de un envío.
      *
-     * Cambia su estado a ENTREGADO y registra el movimiento
-     * correspondiente en su historial.
+     * Cambia el estado a ENTREGADO y registra el movimiento
+     * correspondiente en el historial.
      *
-     * @param codigo Código del envío que se desea finalizar.
-     * @param observacion Detalle asociado a la entrega.
-     * @return true si el envío fue encontrado y finalizado,
-     *         false si no existe.
+     * @param codigo Código del envío.
+     * @param observacion Información sobre la entrega.
+     *
+     * @return true si se pudo finalizar.
+     * @return false si no existe o ya estaba entregado.
      */
     bool finalizarEntrega(const std::string& codigo,
                           const std::string& observacion);
 
     /**
-     * @brief Muestra un resumen de los envíos correspondientes a una zona.
+     * @brief Muestra el historial en orden cronológico.
      *
-     * El recorrido de los envíos se realiza mediante una función
-     * recursiva, sin utilizar ciclos en dicho recorrido.
+     * @param codigo Código del envío.
      *
-     * @param zona Zona sobre la cual se desea obtener el resumen.
+     * @return true si el envío existe.
+     * @return false si no existe.
+     */
+    bool mostrarHistorialAdelante(const std::string& codigo) const;
+
+    /**
+     * @brief Muestra el historial en orden inverso.
+     *
+     * Utiliza los punteros prev de la lista doblemente enlazada.
+     *
+     * @param codigo Código del envío.
+     *
+     * @return true si el envío existe.
+     * @return false si no existe.
+     */
+    bool mostrarHistorialAtras(const std::string& codigo) const;
+
+    /**
+     * @brief Muestra un resumen recursivo de una zona.
+     *
+     * Calcula cantidad de paquetes, peso total y cantidad
+     * de envíos EXPRESS.
+     *
+     * @param zona Zona que se desea consultar.
      */
     void mostrarResumenPorZona(const std::string& zona) const;
 
 private:
+
     /**
-     * @brief Lista de envíos que todavía se encuentran pendientes de despacho.
+     * @brief Nodo del registro central de envíos.
+     *
+     * El nodo contiene un puntero al envío y un puntero
+     * al siguiente nodo.
+     */
+    struct NodoEnvio
+    {
+        Envio* envio;
+        NodoEnvio* siguiente;
+
+        /**
+         * @brief Construye un nodo del registro.
+         *
+         * @param e Puntero al envío.
+         */
+        explicit NodoEnvio(Envio* e)
+            : envio(e), siguiente(nullptr)
+        {
+        }
+    };
+
+    /**
+     * @brief Primer nodo del registro central.
+     */
+    NodoEnvio* registro_;
+
+    /**
+     * @brief Lista de envíos pendientes.
      */
     ListaPendientes pendientes_;
 
-    /*
-     * Registro central de envíos.
+    /**
+     * @brief Busca recursivamente un envío.
      *
-     * Acá tenemos que decidir qué estructura vamos a utilizar para
-     * mantener vivos los Envio aunque salgan de ListaPendientes.
+     * @param nodo Nodo actual del registro.
+     * @param codigo Código buscado.
+     *
+     * @return Puntero al envío encontrado o nullptr.
      */
+    Envio* buscarRecursivo(NodoEnvio* nodo,
+                           const std::string& codigo) const;
 
     /**
-     * @brief Realiza recursivamente el resumen de los envíos de una zona.
+     * @brief Libera recursivamente el registro central.
      *
-     * @param nodo Nodo actual desde el cual continuar el recorrido.
-     * @param zona Zona que se desea consultar.
-     * @param cantidad Cantidad acumulada de envíos encontrados.
+     * Destruye los nodos y los objetos Envio almacenados.
+     *
+     * @param nodo Nodo desde el cual comenzar.
      */
-    void resumenPorZonaRecursivo(const std::string& zona, int& cantidad) const;
+    void destruirRegistro(NodoEnvio* nodo);
+
+    /**
+     * @brief Realiza recursivamente el resumen de una zona.
+     *
+     * @param nodo Nodo actual de la lista de pendientes.
+     * @param zona Zona buscada.
+     * @param cantidad Cantidad acumulada de paquetes.
+     * @param pesoTotal Peso acumulado.
+     * @param cantidadExpress Cantidad acumulada de EXPRESS.
+     */
+    void resumenPorZonaRecursivo(
+        const NodoPendiente* nodo,
+        const std::string& zona,
+        int& cantidad,
+        double& pesoTotal,
+        int& cantidadExpress
+    ) const;
 };
 
 #endif // HUBFLOW_HPP

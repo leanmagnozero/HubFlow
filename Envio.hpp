@@ -4,7 +4,7 @@
 #include "NivelServicio.hpp"
 #include "Historial.hpp"
 #include <string>
-
+/*
 /// Estados posibles del ciclo de vida de un envío.
 enum class EstadoEnvio {
     RECIBIDO,
@@ -13,6 +13,7 @@ enum class EstadoEnvio {
     REPROGRAMADO,
     ENTREGADO
 };
+*/
 
 /**
  * @brief Representa un envío gestionado por el centro de distribución.
