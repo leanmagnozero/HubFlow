@@ -3,5 +3,7 @@
 
 #include <gtest/gtest.h>
 #include "HubFlow.hpp"
+#include "Historial.hpp"
+#include "NivelServicio.hpp"
 
 #endif // TEST_HUBFLOW_HPP
