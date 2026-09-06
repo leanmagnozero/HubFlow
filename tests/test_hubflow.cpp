@@ -114,3 +114,59 @@ TEST(HubFlowTest, Caso7_CasosLimite) {
     hub.despacharProximo(); // vacía la lista
     EXPECT_EQ(hub.despacharProximo(), nullptr);
 }
+
+// CASO 8: Paquete más pesado por zona
+TEST(HubFlowTest, Caso8_MasPesadoPorZona) {
+    HubFlow hub;
+
+    hub.registrarEnvio(
+        "PKG-01", "Ana", "NORTE",
+        1.0, NivelServicio::EXPRESS
+    );
+
+    hub.registrarEnvio(
+        "PKG-02", "Bruno", "NORTE",
+        3.5, NivelServicio::PRIORITARIO
+    );
+
+    hub.registrarEnvio(
+        "PKG-03", "Carla", "NORTE",
+        2.0, NivelServicio::ESTANDAR
+    );
+
+    hub.registrarEnvio(
+        "PKG-04", "Diego", "SUR",
+        10.0, NivelServicio::EXPRESS
+    );
+
+    // El paquete más pesado de NORTE debe ser PKG-02.
+    Envio* masPesado =
+        hub.obtenerMasPesadoPorZona("NORTE");
+
+    ASSERT_NE(masPesado, nullptr);
+    EXPECT_EQ(masPesado->getCodigo(), "PKG-02");
+    EXPECT_DOUBLE_EQ(masPesado->getPeso(), 3.5);
+
+    // El paquete de 10 kg pertenece a SUR,
+    // por lo tanto no debe afectar el resultado.
+    Envio* masPesadoSur =
+        hub.obtenerMasPesadoPorZona("SUR");
+
+    ASSERT_NE(masPesadoSur, nullptr);
+    EXPECT_EQ(masPesadoSur->getCodigo(), "PKG-04");
+}
+
+// CASO 9: Zona sin envíos pendientes
+TEST(HubFlowTest, Caso9_MasPesadoZonaInexistente) {
+    HubFlow hub;
+
+    hub.registrarEnvio(
+        "PKG-01", "Ana", "NORTE",
+        1.0, NivelServicio::EXPRESS
+    );
+
+    Envio* masPesado =
+        hub.obtenerMasPesadoPorZona("OESTE");
+
+    EXPECT_EQ(masPesado, nullptr);
+}
