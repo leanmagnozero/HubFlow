@@ -48,6 +48,19 @@ public:
 
     void mostrarResumenPorZona(const std::string& zona) const;
 
+    /**
+     * @brief Obtiene el envío pendiente de mayor peso de una zona.
+     *
+     * La búsqueda se realiza recorriendo recursivamente la lista
+     * de envíos pendientes.
+     *
+     * @param zona Zona que se desea consultar.
+     *
+     * @return Puntero al envío de mayor peso de la zona o nullptr
+     *         si no hay envíos pendientes en esa zona.
+     */
+    Envio* obtenerMasPesadoPorZona(const std::string& zona) const;
+
 private:
 
     struct NodoEnvio
@@ -76,6 +89,21 @@ private:
         int& cantidad,
         double& pesoTotal,
         int& cantidadExpress
+    ) const;
+
+    /**
+     * @brief Busca recursivamente el envío más pesado de una zona.
+     *
+     * @param nodo Nodo actual de la lista de pendientes.
+     * @param zona Zona que se está buscando.
+     * @param masPesado Puntero al envío más pesado encontrado hasta el momento.
+     *
+     * @return Puntero al envío más pesado encontrado.
+     */
+    Envio* obtenerMasPesadoPorZonaRecursivo(
+        const NodoPendiente* nodo,
+        const std::string& zona,
+        Envio* masPesado
     ) const;
 };
 
