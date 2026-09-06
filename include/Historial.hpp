@@ -4,7 +4,6 @@
 #include <iostream>
 #include <string>
 
-/// Estados posibles del ciclo de vida de un envío.
 enum class EstadoEnvio {
     RECIBIDO,
     CLASIFICADO,
@@ -13,7 +12,6 @@ enum class EstadoEnvio {
     ENTREGADO
 };
 
-/// Un evento puntual en la vida de un envío.
 class Movimiento {
 private:
     int numero;
@@ -29,7 +27,6 @@ public:
     const std::string& getObservacion() const { return observacion; }
 };
 
-/// Nodo de la lista doblemente enlazada de historial.
 class NodoDoble {
 public:
     Movimiento dato;
@@ -39,12 +36,6 @@ public:
     NodoDoble(const Movimiento& m) : dato(m), next(nullptr), prev(nullptr) {}
 };
 
-/**
- * @brief Historial de movimientos de un envío, como lista doblemente enlazada.
- *
- * Permite recorrido cronológico (con next) e inverso (con prev), sin
- * necesidad de copiar los movimientos a otra estructura.
- */
 class Historial {
 private:
     NodoDoble* cabeza; // primer movimiento en el tiempo
