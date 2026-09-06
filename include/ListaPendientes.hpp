@@ -12,10 +12,10 @@
  * lista (despacharProximo) no destruye el envío.
  */
 struct NodoPendiente {
-    Envio* envio;
-    NodoPendiente* siguiente;
+  Envio *envio;
+  NodoPendiente *siguiente;
 
-    explicit NodoPendiente(Envio* e) : envio(e), siguiente(nullptr) {}
+  explicit NodoPendiente(Envio *e) : envio(e), siguiente(nullptr) {}
 };
 
 /**
@@ -27,29 +27,32 @@ struct NodoPendiente {
  */
 class ListaPendientes {
 public:
-    ListaPendientes() = default;
-    ListaPendientes(const ListaPendientes&) = delete;
-    ListaPendientes& operator=(const ListaPendientes&) = delete;
+  ListaPendientes() = default;
+  ListaPendientes(const ListaPendientes &) = delete;
+  ListaPendientes &operator=(const ListaPendientes &) = delete;
 
-    /// Libera todos los nodos de la lista (no los objetos Envio referenciados).
-    ~ListaPendientes();
+  /// Libera todos los nodos de la lista (no los objetos Envio referenciados).
+  ~ListaPendientes();
 
-    /// Inserta un envío respetando prioridad y estabilidad FIFO.
-    void insertar(Envio* envio);
+  /// Inserta un envío respetando prioridad y estabilidad FIFO.
+  void insertar(Envio *envio);
 
-    /// Extrae, sin destruir, el envío con mayor prioridad (el primero).
-    Envio* despacharProximo();
+  /// Extrae, sin destruir, el envío con mayor prioridad (el primero).
+  Envio *despacharProximo();
 
-    /// Busca un envío por código recorriendo la lista. Solo entre los pendientes.
-    Envio* buscarPorCodigo(const std::string& codigo) const;
+  /// Busca un envío por código recorriendo la lista. Solo entre los pendientes.
+  Envio *buscarPorCodigo(const std::string &codigo) const;
 
-    bool estaVacia() const { return cabeza_ == nullptr; }
+  /// Extrae un envío de pendientes por código (sin destruir el Envio).
+  bool extraerPorCodigo(const std::string &codigo);
 
-    /// Acceso de solo lectura, para recorridos externos (mostrar, recursiva).
-    const NodoPendiente* getCabeza() const { return cabeza_; }
+  bool estaVacia() const { return cabeza_ == nullptr; }
+
+  /// Acceso de solo lectura, para recorridos externos (mostrar, recursiva).
+  const NodoPendiente *getCabeza() const { return cabeza_; }
 
 private:
-    NodoPendiente* cabeza_{nullptr};
+  NodoPendiente *cabeza_{nullptr};
 };
 
 #endif // HUBFLOW_LISTA_PENDIENTES_HPP

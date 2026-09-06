@@ -3,413 +3,289 @@
 #include <iostream>
 
 HubFlow::HubFlow()
-    : registro_(nullptr),
-      pendientes_()
-{
+    : registro_(nullptr), // guarda todos los paquetes que existen en el sistema
+      pendientes_() // cola de prioridad, debería tener uniicamente los paquetes
+                    // del depósito (RECIBIDO O REPROGRAMANDO)
+{}
+
+HubFlow::~HubFlow() { destruirRegistro(registro_); }
+
+void HubFlow::destruirRegistro(NodoEnvio *nodo) {
+  if (nodo == nullptr) {
+    return;
+  }
+
+  destruirRegistro(nodo->siguiente);
+
+  delete nodo->envio;
+  delete nodo;
 }
 
-HubFlow::~HubFlow()
-{
-    destruirRegistro(registro_);
+bool HubFlow::registrarEnvio(const std::string &codigo,
+                             const std::string &destinatario,
+                             const std::string &zona, double peso,
+                             NivelServicio servicio) {
+  // Verificamos que el código sea único.
+  if (buscarEnvio(codigo) != nullptr) {
+    return false;
+  }
+
+  // Creamos dinámicamente el envío.
+  Envio *nuevoEnvio = new Envio(codigo, destinatario, zona, peso, servicio);
+  /* Duplicado, ya se implementó en src//envio.cpp, considero más correcto
+     eliminar estas lineas (50-57)
+      // Registramos el primer movimiento.
+      nuevoEnvio->getHistorial().agregar(
+          Movimiento(
+              1,
+              EstadoEnvio::RECIBIDO,
+              "Ingreso al centro de distribución"
+          )
+      );
+  */
+  // Creamos el nodo del registro central.
+  NodoEnvio *nuevoNodo = new NodoEnvio(nuevoEnvio);
+
+  // Insertamos el nodo al principio del registro.
+  nuevoNodo->siguiente = registro_;
+  registro_ = nuevoNodo;
+
+  // Insertamos el envío en pendientes.
+  pendientes_.insertar(nuevoEnvio);
+
+  return true;
 }
 
-void HubFlow::destruirRegistro(NodoEnvio* nodo)
-{
-    if (nodo == nullptr)
-    {
-        return;
-    }
+Envio *HubFlow::buscarRecursivo(NodoEnvio *nodo,
+                                const std::string &codigo) const {
+  // Caso base:
+  // llegamos al final de la lista.
+  if (nodo == nullptr) {
+    return nullptr;
+  }
 
-    destruirRegistro(nodo->siguiente);
+  // Encontramos el envío.
+  if (nodo->envio->getCodigo() == codigo) {
+    return nodo->envio;
+  }
 
-    delete nodo->envio;
-    delete nodo;
+  // Caso recursivo:
+  // buscamos en el siguiente nodo.
+  return buscarRecursivo(nodo->siguiente, codigo);
 }
 
-bool HubFlow::registrarEnvio(const std::string& codigo,
-                             const std::string& destinatario,
-                             const std::string& zona,
-                             double peso,
-                             NivelServicio servicio)
-{
-    // Verificamos que el código sea único.
-    if (buscarEnvio(codigo) != nullptr)
-    {
-        return false;
-    }
-
-    // Creamos dinámicamente el envío.
-    Envio* nuevoEnvio = new Envio(
-        codigo,
-        destinatario,
-        zona,
-        peso,
-        servicio
-    );
-
-    // Registramos el primer movimiento.
-    nuevoEnvio->getHistorial().agregar(
-        Movimiento(
-            1,
-            EstadoEnvio::RECIBIDO,
-            "Ingreso al centro de distribución"
-        )
-    );
-
-    // Creamos el nodo del registro central.
-    NodoEnvio* nuevoNodo = new NodoEnvio(nuevoEnvio);
-
-    // Insertamos el nodo al principio del registro.
-    nuevoNodo->siguiente = registro_;
-    registro_ = nuevoNodo;
-
-    // Insertamos el envío en pendientes.
-    pendientes_.insertar(nuevoEnvio);
-
-    return true;
+Envio *HubFlow::buscarEnvio(const std::string &codigo) const {
+  return buscarRecursivo(registro_, codigo);
 }
 
-Envio* HubFlow::buscarRecursivo(
-    NodoEnvio* nodo,
-    const std::string& codigo) const
-{
-    // Caso base:
-    // llegamos al final de la lista.
-    if (nodo == nullptr)
-    {
-        return nullptr;
-    }
+void HubFlow::mostrarPendientes() const {
+  const NodoPendiente *actual = pendientes_.getCabeza();
 
-    // Encontramos el envío.
-    if (nodo->envio->getCodigo() == codigo)
-    {
-        return nodo->envio;
-    }
+  if (actual == nullptr) {
+    std::cout << "No hay envios pendientes.\n";
 
-    // Caso recursivo:
-    // buscamos en el siguiente nodo.
-    return buscarRecursivo(
-        nodo->siguiente,
-        codigo
-    );
+    return;
+  }
+
+  std::cout << "\n========== ENVIOS PENDIENTES ==========\n";
+
+  while (actual != nullptr) {
+    const Envio *envio = actual->envio;
+
+    std::cout << "Codigo: " << envio->getCodigo()
+
+              << " | Destinatario: " << envio->getDestinatario()
+
+              << " | Zona: " << envio->getZona()
+
+              << " | Peso: " << envio->getPeso() << " kg"
+
+              << " | Servicio: " << static_cast<int>(envio->getServicio())
+
+              << " | Estado: " << static_cast<int>(envio->getEstado())
+
+              << " | Intentos: " << envio->getIntentos()
+
+              << '\n';
+
+    actual = actual->siguiente;
+  }
 }
 
-Envio* HubFlow::buscarEnvio(
-    const std::string& codigo) const
-{
-    return buscarRecursivo(
-        registro_,
-        codigo
-    );
+bool HubFlow::cambiarEstado(const std::string &codigo, EstadoEnvio nuevoEstado,
+                            const std::string &observacion) {
+  Envio *envio = buscarEnvio(codigo);
+
+  if (envio == nullptr) {
+    return false;
+  }
+
+  envio->setEstado(nuevoEstado); //<-- cambia el estado EN el OBJETO
+
+  // si el paquete ya no está en pendientes se extrae de la lista
+  if (nuevoEstado == EstadoEnvio::ENTREGADO ||
+      nuevoEstado == EstadoEnvio::EN_REPARTO) {
+    pendientes_.extraerPorCodigo(codigo);
+  }
+  // El nuevo movimiento recibe el número siguiente.
+  int numeroMovimiento = envio->getHistorial().cantidad() + 1;
+
+  // Guardamos el cambio en el historial.
+  envio->getHistorial().agregar(
+      Movimiento(numeroMovimiento, nuevoEstado, observacion));
+
+  return true;
 }
 
-void HubFlow::mostrarPendientes() const
-{
-    const NodoPendiente* actual =
-        pendientes_.getCabeza();
+Envio *HubFlow::despacharProximo() {
+  /*
+   * La lista elimina el NodoPendiente,
+   * pero NO elimina el Envio.
+   */
+  Envio *envio = pendientes_.despacharProximo();
 
-    if (actual == nullptr)
-    {
-        std::cout
-            << "No hay envios pendientes.\n";
+  if (envio == nullptr) {
+    return nullptr;
+  }
 
-        return;
-    }
+  // Cambiamos el estado.
+  envio->setEstado(EstadoEnvio::EN_REPARTO);
 
-    std::cout
-        << "\n========== ENVIOS PENDIENTES ==========\n";
+  // Creamos el movimiento.
+  int numeroMovimiento = envio->getHistorial().cantidad() + 1;
 
-    while (actual != nullptr)
-    {
-        const Envio* envio = actual->envio;
+  envio->getHistorial().agregar(Movimiento(
+      numeroMovimiento, EstadoEnvio::EN_REPARTO, "Envio despachado"));
 
-        std::cout
-            << "Codigo: "
-            << envio->getCodigo()
-
-            << " | Destinatario: "
-            << envio->getDestinatario()
-
-            << " | Zona: "
-            << envio->getZona()
-
-            << " | Peso: "
-            << envio->getPeso()
-            << " kg"
-
-            << " | Servicio: "
-            << static_cast<int>(
-                envio->getServicio()
-            )
-
-            << " | Estado: "
-            << static_cast<int>(
-                envio->getEstado()
-            )
-
-            << " | Intentos: "
-            << envio->getIntentos()
-
-            << '\n';
-
-        actual = actual->siguiente;
-    }
+  return envio;
 }
 
-bool HubFlow::cambiarEstado(
-    const std::string& codigo,
-    EstadoEnvio nuevoEstado,
-    const std::string& observacion)
-{
-    Envio* envio = buscarEnvio(codigo);
+bool HubFlow::reprogramarEnvio(const std::string &codigo,
+                               const std::string &observacion) {
+  Envio *envio = buscarEnvio(codigo);
 
-    if (envio == nullptr)
-    {
-        return false;
-    }
+  if (envio == nullptr) {
+    return false;
+  }
 
-    // Actualizamos el estado.
-    envio->setEstado(nuevoEstado);
+  // Un envío entregado no puede volver a pendientes.
+  if (envio->getEstado() == EstadoEnvio::ENTREGADO) {
+    return false;
+  }
 
-    // El nuevo movimiento recibe el número siguiente.
-    int numeroMovimiento =
-        envio->getHistorial().cantidad() + 1;
+  // Aumentamos la cantidad de intentos.
+  envio->incrementarIntentos();
 
-    // Guardamos el cambio en el historial.
-    envio->getHistorial().agregar(
-        Movimiento(
-            numeroMovimiento,
-            nuevoEstado,
-            observacion
-        )
-    );
+  // Cambiamos el estado.
+  envio->setEstado(EstadoEnvio::REPROGRAMADO);
 
-    return true;
+  // Obtenemos el número del nuevo movimiento.
+  int numeroMovimiento = envio->getHistorial().cantidad() + 1;
+
+  // Registramos la reprogramación.
+  envio->getHistorial().agregar(
+      Movimiento(numeroMovimiento, EstadoEnvio::REPROGRAMADO, observacion));
+
+  // Volvemos a insertar el envío en pendientes.
+  // La lista decide dónde colocarlo según prioridad.
+  pendientes_.insertar(envio);
+
+  return true;
 }
 
-Envio* HubFlow::despacharProximo()
-{
-    /*
-     * La lista elimina el NodoPendiente,
-     * pero NO elimina el Envio.
-     */
-    Envio* envio =
-        pendientes_.despacharProximo();
+bool HubFlow::finalizarEntrega(const std::string &codigo,
+                               const std::string &observacion) {
+  Envio *envio = buscarEnvio(codigo);
 
-    if (envio == nullptr)
-    {
-        return nullptr;
-    }
+  if (envio == nullptr) {
+    return false;
+  }
 
-    // Cambiamos el estado.
-    envio->setEstado(
-        EstadoEnvio::EN_REPARTO
-    );
+  // Evitamos entregar dos veces el mismo envío.
+  if (envio->getEstado() == EstadoEnvio::ENTREGADO) {
+    return false;
+  }
 
-    // Creamos el movimiento.
-    int numeroMovimiento =
-        envio->getHistorial().cantidad() + 1;
+  // Cambiamos el estado.
+  envio->setEstado(EstadoEnvio::ENTREGADO);
+  pendientes_.extraerPorCodigo(codigo);
 
-    envio->getHistorial().agregar(
-        Movimiento(
-            numeroMovimiento,
-            EstadoEnvio::EN_REPARTO,
-            "Envio despachado"
-        )
-    );
+  // Calculamos el número del movimiento.
+  int numeroMovimiento = envio->getHistorial().cantidad() + 1;
 
-    return envio;
+  // Registramos la entrega.
+  envio->getHistorial().agregar(
+      Movimiento(numeroMovimiento, EstadoEnvio::ENTREGADO, observacion));
+
+  return true;
 }
 
-bool HubFlow::reprogramarEnvio(
-    const std::string& codigo,
-    const std::string& observacion)
-{
-    Envio* envio = buscarEnvio(codigo);
+bool HubFlow::mostrarHistorialAdelante(const std::string &codigo) const {
+  Envio *envio = buscarEnvio(codigo);
 
-    if (envio == nullptr)
-    {
-        return false;
-    }
+  if (envio == nullptr) {
+    return false;
+  }
 
-    // Un envío entregado no puede volver a pendientes.
-    if (envio->getEstado() ==
-        EstadoEnvio::ENTREGADO)
-    {
-        return false;
-    }
+  envio->getHistorial().mostrarAdelante();
 
-    // Aumentamos la cantidad de intentos.
-    envio->incrementarIntentos();
-
-    // Cambiamos el estado.
-    envio->setEstado(
-        EstadoEnvio::REPROGRAMADO
-    );
-
-    // Obtenemos el número del nuevo movimiento.
-    int numeroMovimiento =
-        envio->getHistorial().cantidad() + 1;
-
-    // Registramos la reprogramación.
-    envio->getHistorial().agregar(
-        Movimiento(
-            numeroMovimiento,
-            EstadoEnvio::REPROGRAMADO,
-            observacion
-        )
-    );
-
-    // Volvemos a insertar el envío en pendientes.
-    // La lista decide dónde colocarlo según prioridad.
-    pendientes_.insertar(envio);
-
-    return true;
+  return true;
 }
 
-bool HubFlow::finalizarEntrega(
-    const std::string& codigo,
-    const std::string& observacion)
-{
-    Envio* envio = buscarEnvio(codigo);
+bool HubFlow::mostrarHistorialAtras(const std::string &codigo) const {
+  Envio *envio = buscarEnvio(codigo);
 
-    if (envio == nullptr)
-    {
-        return false;
-    }
+  if (envio == nullptr) {
+    return false;
+  }
 
-    // Evitamos entregar dos veces el mismo envío.
-    if (envio->getEstado() ==
-        EstadoEnvio::ENTREGADO)
-    {
-        return false;
-    }
+  envio->getHistorial().mostrarAtras();
 
-    // Cambiamos el estado.
-    envio->setEstado(
-        EstadoEnvio::ENTREGADO
-    );
-
-    // Calculamos el número del movimiento.
-    int numeroMovimiento =
-        envio->getHistorial().cantidad() + 1;
-
-    // Registramos la entrega.
-    envio->getHistorial().agregar(
-        Movimiento(
-            numeroMovimiento,
-            EstadoEnvio::ENTREGADO,
-            observacion
-        )
-    );
-
-    return true;
+  return true;
 }
 
-bool HubFlow::mostrarHistorialAdelante(
-    const std::string& codigo) const
-{
-    Envio* envio = buscarEnvio(codigo);
+void HubFlow::resumenPorZonaRecursivo(const NodoPendiente *nodo,
+                                      const std::string &zona, int &cantidad,
+                                      double &pesoTotal,
+                                      int &cantidadExpress) const {
+  // CASO BASE
+  if (nodo == nullptr) {
+    return;
+  }
 
-    if (envio == nullptr)
-    {
-        return false;
+  const Envio *envio = nodo->envio;
+
+  // Procesamos el nodo actual.
+  if (envio->getZona() == zona) {
+    ++cantidad;
+
+    pesoTotal += envio->getPeso();
+
+    if (envio->getServicio() == NivelServicio::EXPRESS) {
+      ++cantidadExpress;
     }
+  }
 
-    envio->getHistorial().mostrarAdelante();
-
-    return true;
+  // LLAMADA RECURSIVA
+  resumenPorZonaRecursivo(nodo->siguiente, zona, cantidad, pesoTotal,
+                          cantidadExpress);
 }
 
-bool HubFlow::mostrarHistorialAtras(
-    const std::string& codigo) const
-{
-    Envio* envio = buscarEnvio(codigo);
+void HubFlow::mostrarResumenPorZona(const std::string &zona) const {
+  int cantidad = 0;
+  double pesoTotal = 0.0;
+  int cantidadExpress = 0;
 
-    if (envio == nullptr)
-    {
-        return false;
-    }
+  resumenPorZonaRecursivo(pendientes_.getCabeza(), zona, cantidad, pesoTotal,
+                          cantidadExpress);
 
-    envio->getHistorial().mostrarAtras();
+  std::cout << "\n========== RESUMEN POR ZONA ==========\n";
 
-    return true;
-}
+  std::cout << "Zona: " << zona << '\n';
 
-void HubFlow::resumenPorZonaRecursivo(
-    const NodoPendiente* nodo,
-    const std::string& zona,
-    int& cantidad,
-    double& pesoTotal,
-    int& cantidadExpress) const
-{
-    // CASO BASE
-    if (nodo == nullptr)
-    {
-        return;
-    }
+  std::cout << "Cantidad de paquetes: " << cantidad << '\n';
 
-    const Envio* envio = nodo->envio;
+  std::cout << "Peso total pendiente: " << pesoTotal << " kg\n";
 
-    // Procesamos el nodo actual.
-    if (envio->getZona() == zona)
-    {
-        ++cantidad;
-
-        pesoTotal += envio->getPeso();
-
-        if (envio->getServicio() ==
-            NivelServicio::EXPRESS)
-        {
-            ++cantidadExpress;
-        }
-    }
-
-    // LLAMADA RECURSIVA
-    resumenPorZonaRecursivo(
-        nodo->siguiente,
-        zona,
-        cantidad,
-        pesoTotal,
-        cantidadExpress
-    );
-}
-
-void HubFlow::mostrarResumenPorZona(
-    const std::string& zona) const
-{
-    int cantidad = 0;
-    double pesoTotal = 0.0;
-    int cantidadExpress = 0;
-
-    resumenPorZonaRecursivo(
-        pendientes_.getCabeza(),
-        zona,
-        cantidad,
-        pesoTotal,
-        cantidadExpress
-    );
-
-    std::cout
-        << "\n========== RESUMEN POR ZONA ==========\n";
-
-    std::cout
-        << "Zona: "
-        << zona
-        << '\n';
-
-    std::cout
-        << "Cantidad de paquetes: "
-        << cantidad
-        << '\n';
-
-    std::cout
-        << "Peso total pendiente: "
-        << pesoTotal
-        << " kg\n";
-
-    std::cout
-        << "Cantidad EXPRESS: "
-        << cantidadExpress
-        << '\n';
+  std::cout << "Cantidad EXPRESS: " << cantidadExpress << '\n';
 }
