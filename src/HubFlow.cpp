@@ -11,14 +11,13 @@ HubFlow::HubFlow()
 HubFlow::~HubFlow() { destruirRegistro(registro_); }
 
 void HubFlow::destruirRegistro(NodoEnvio *nodo) {
-  if (nodo == nullptr) {
-    return;
+  while (nodo != nullptr) { // evitamos stack overflow por stack frame
+    NodoEnvio *siguiente = nodo->siguiente;
+
+    delete nodo->envio;
+    delete nodo;
+    nodo = siguiente;
   }
-
-  destruirRegistro(nodo->siguiente);
-
-  delete nodo->envio;
-  delete nodo;
 }
 
 bool HubFlow::registrarEnvio(const std::string &codigo,
